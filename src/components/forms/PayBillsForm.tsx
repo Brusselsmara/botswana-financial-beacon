@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,28 +14,91 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { getBillProviders, processPayment } from "@/services/paymentService";
+import { useQueryClient } from "@tanstack/react-query";
+import { BillProvider } from "@/services/paymentService";
 
 export function PayBillsForm() {
   const [amount, setAmount] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [provider, setProvider] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [billProviders, setBillProviders] = useState<BillProvider[]>([]);
+  const [isFetchingProviders, setIsFetchingProviders] = useState(false);
+  const queryClient = useQueryClient();
+  
+  // Fetch bill providers
+  useEffect(() => {
+    const fetchBillProviders = async () => {
+      setIsFetchingProviders(true);
+      try {
+        const providers = await getBillProviders();
+        setBillProviders(providers);
+      } catch (error) {
+        toast.error("Failed to load bill providers");
+      } finally {
+        setIsFetchingProviders(false);
+      }
+    };
+    
+    fetchBillProviders();
+  }, []);
+  
+  // Group providers by category
+  const providersByCategory = billProviders.reduce((acc, provider) => {
+    if (!acc[provider.category]) {
+      acc[provider.category] = [];
+    }
+    acc[provider.category].push(provider);
+    return acc;
+  }, {} as Record<string, BillProvider[]>);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Validate the amount
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        throw new Error("Please enter a valid amount");
+      }
+      
+      // Find the provider name
+      const selectedProvider = billProviders.find(p => p.id === provider);
+      if (!selectedProvider) {
+        throw new Error("Please select a valid provider");
+      }
+      
+      // Process the payment
+      await processPayment(
+        'bill_payment',
+        numAmount,
+        accountNumber,
+        selectedProvider.name,
+        `Bill payment for ${selectedProvider.name}`,
+        'wallet'
+      );
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions-all'] });
+      
       toast.success("Bill payment successful", {
-        description: `P${amount} paid to ${provider}`,
+        description: `P${amount} paid to ${selectedProvider.name}`,
       });
       
       // Reset form
       setAmount("");
       setAccountNumber("");
-    }, 1500);
+    } catch (error: any) {
+      toast.error("Failed to pay bill", {
+        description: error.message || "Please try again",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -50,27 +113,19 @@ export function PayBillsForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="provider">Service Provider</Label>
-            <Select value={provider} onValueChange={setProvider} required>
+            <Select value={provider} onValueChange={setProvider} required disabled={isLoading || isFetchingProviders}>
               <SelectTrigger id="provider">
-                <SelectValue placeholder="Select service provider" />
+                <SelectValue placeholder={isFetchingProviders ? "Loading providers..." : "Select service provider"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Utilities</SelectLabel>
-                  <SelectItem value="bpc">Botswana Power Corporation</SelectItem>
-                  <SelectItem value="wuc">Water Utilities Corporation</SelectItem>
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel>Telecommunications</SelectLabel>
-                  <SelectItem value="btc">BTC</SelectItem>
-                  <SelectItem value="orange">Orange</SelectItem>
-                  <SelectItem value="mascom">Mascom</SelectItem>
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel>Other</SelectLabel>
-                  <SelectItem value="dstv">DSTV</SelectItem>
-                  <SelectItem value="council">City Council</SelectItem>
-                </SelectGroup>
+                {Object.entries(providersByCategory).map(([category, providers]) => (
+                  <SelectGroup key={category}>
+                    <SelectLabel>{category}</SelectLabel>
+                    {providers.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>{provider.name}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -83,6 +138,7 @@ export function PayBillsForm() {
               required
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           
@@ -100,6 +156,7 @@ export function PayBillsForm() {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -107,7 +164,7 @@ export function PayBillsForm() {
           <Button 
             type="submit" 
             className="w-full bg-pulapay-green hover:bg-pulapay-green-dark"
-            disabled={isLoading}
+            disabled={isLoading || isFetchingProviders}
           >
             {isLoading ? "Processing..." : "Pay Bill"}
           </Button>

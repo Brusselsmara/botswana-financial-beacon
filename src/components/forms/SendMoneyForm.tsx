@@ -12,21 +12,43 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { processPayment } from "@/services/paymentService";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function SendMoneyForm() {
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("bank");
+  const [paymentMethod, setPaymentMethod] = useState("wallet");
   const [note, setNote] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Validate the amount
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        throw new Error("Please enter a valid amount");
+      }
+      
+      // Process the payment
+      await processPayment(
+        'send',
+        numAmount,
+        recipient,
+        undefined, // recipient name
+        note,
+        paymentMethod as 'wallet' | 'bank' | 'card'
+      );
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions-all'] });
+      
       toast.success("Money sent successfully", {
         description: `P${amount} sent to ${recipient}`,
       });
@@ -35,7 +57,13 @@ export function SendMoneyForm() {
       setAmount("");
       setRecipient("");
       setNote("");
-    }, 1500);
+    } catch (error: any) {
+      toast.error("Failed to send money", {
+        description: error.message || "Please try again",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -56,6 +84,7 @@ export function SendMoneyForm() {
               required
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           
@@ -73,13 +102,14 @@ export function SendMoneyForm() {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="payment-method">Payment Method</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={isLoading}>
               <SelectTrigger id="payment-method">
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
@@ -98,6 +128,7 @@ export function SendMoneyForm() {
               placeholder="What's this payment for?"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           

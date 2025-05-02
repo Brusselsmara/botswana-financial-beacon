@@ -4,120 +4,52 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowUpRight, ArrowDownLeft, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface Transaction {
-  id: string;
-  type: 'credit' | 'debit';
-  description: string;
-  amount: number;
-  date: string;
-  status: 'completed' | 'pending' | 'failed';
-}
+import { useQuery } from "@tanstack/react-query";
+import { getTransactions } from "@/services/paymentService";
+import { toast } from "sonner";
+import { Transaction } from "@/services/paymentService";
 
 export function Transactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   
-  // Mock data for demonstration
-  const allTransactions: Transaction[] = [
-    {
-      id: "1",
-      type: "debit",
-      description: "Transfer to Mpho K.",
-      amount: 500,
-      date: "Today, 14:30",
-      status: "completed"
-    },
-    {
-      id: "2",
-      type: "credit",
-      description: "Deposit from BancABC",
-      amount: 2500,
-      date: "May 1, 2025",
-      status: "completed"
-    },
-    {
-      id: "3",
-      type: "debit",
-      description: "BPC Bill Payment",
-      amount: 350.75,
-      date: "Apr 28, 2025",
-      status: "completed"
-    },
-    {
-      id: "4",
-      type: "debit",
-      description: "Mobile Airtime",
-      amount: 50,
-      date: "Apr 27, 2025",
-      status: "completed"
-    },
-    {
-      id: "5",
-      type: "credit",
-      description: "Refund - Shoprite",
-      amount: 125.80,
-      date: "Apr 26, 2025",
-      status: "completed"
-    },
-    {
-      id: "6",
-      type: "debit",
-      description: "Water Bill - WUC",
-      amount: 210.50,
-      date: "Apr 22, 2025",
-      status: "completed"
-    },
-    {
-      id: "7",
-      type: "credit",
-      description: "Transfer from Tebogo M.",
-      amount: 300,
-      date: "Apr 20, 2025",
-      status: "completed"
-    },
-    {
-      id: "8",
-      type: "debit",
-      description: "DSTV Subscription",
-      amount: 489,
-      date: "Apr 15, 2025",
-      status: "completed"
-    },
-    {
-      id: "9",
-      type: "debit",
-      description: "Choppies - Grocery",
-      amount: 356.75,
-      date: "Apr 12, 2025",
-      status: "completed"
-    },
-    {
-      id: "10",
-      type: "credit",
-      description: "Salary Deposit",
-      amount: 5000,
-      date: "Mar 31, 2025",
-      status: "completed"
-    }
-  ];
+  // Fetch transactions from API
+  const { data: allTransactions = [], isLoading, error } = useQuery({
+    queryKey: ['transactions-all'],
+    queryFn: () => getTransactions(),
+    retry: 1
+  });
+  
+  if (error) {
+    toast.error("Failed to load transactions", {
+      description: "Please refresh the page to try again.",
+    });
+  }
   
   // Filter transactions based on search term and type filter
-  const filteredTransactions = allTransactions.filter(transaction => {
-    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterType === "all" || transaction.type === filterType;
+  const filteredTransactions = allTransactions.filter((transaction: Transaction) => {
+    const searchFields = [
+      transaction.recipient_name || '',
+      transaction.recipient_identifier || '',
+      transaction.description || ''
+    ].join(' ').toLowerCase();
+    
+    const matchesSearch = searchFields.includes(searchTerm.toLowerCase());
+    const matchesFilter = filterType === "all" || 
+                          (filterType === "credit" && transaction.transaction_type === "receive") ||
+                          (filterType === "debit" && (transaction.transaction_type === "send" || transaction.transaction_type === "bill_payment"));
     
     return matchesSearch && matchesFilter;
   });
   
-  const formatAmount = (amount: number, type: 'credit' | 'debit') => {
+  const formatAmount = (amount: number, type: 'receive' | 'send' | 'bill_payment') => {
     const formattedAmount = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'BWP',
       minimumFractionDigits: 2
     }).format(amount);
     
-    return type === 'credit' ? `+${formattedAmount}` : `-${formattedAmount}`;
+    return type === 'receive' ? `+${formattedAmount}` : `-${formattedAmount}`;
   };
 
   return (
@@ -156,32 +88,65 @@ export function Transactions() {
           <CardTitle className="text-xl">All Transactions</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {filteredTransactions.length > 0 ? (
+          {isLoading ? (
             <div className="divide-y">
-              {filteredTransactions.map((transaction) => (
+              {[...Array(5)].map((_, index) => (
+                <div key={index} className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-full p-2 bg-gray-200 h-8 w-8"></div>
+                    <div>
+                      <div className="h-4 w-40 bg-gray-200 animate-pulse rounded mb-2"></div>
+                      <div className="h-3 w-20 bg-gray-100 animate-pulse rounded"></div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="h-4 w-24 bg-gray-200 animate-pulse rounded mb-2"></div>
+                    <div className="h-3 w-16 bg-gray-100 animate-pulse rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredTransactions.length > 0 ? (
+            <div className="divide-y">
+              {filteredTransactions.map((transaction: Transaction) => (
                 <div key={transaction.id} className="flex items-center justify-between p-4 hover:bg-gray-50">
                   <div className="flex items-center gap-4">
                     <div className={`rounded-full p-2 ${
-                      transaction.type === 'credit' 
+                      transaction.transaction_type === 'receive' 
                         ? 'bg-green-100 text-green-600' 
                         : 'bg-red-100 text-red-600'
                     }`}>
-                      {transaction.type === 'credit' ? (
+                      {transaction.transaction_type === 'receive' ? (
                         <ArrowDownLeft size={16} />
                       ) : (
                         <ArrowUpRight size={16} />
                       )}
                     </div>
                     <div>
-                      <p className="font-medium">{transaction.description}</p>
-                      <p className="text-xs text-gray-500">{transaction.date}</p>
+                      <p className="font-medium">
+                        {transaction.transaction_type === 'send' ? 
+                          `Transfer to ${transaction.recipient_name || transaction.recipient_identifier}` : 
+                          transaction.transaction_type === 'receive' ? 
+                            `Received from ${transaction.recipient_name || transaction.recipient_identifier}` : 
+                            `Payment to ${transaction.recipient_name || transaction.recipient_identifier}`
+                        }
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(transaction.created_at).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className={`font-medium ${
-                      transaction.type === 'credit' ? 'text-green-600' : 'text-gray-900'
+                      transaction.transaction_type === 'receive' ? 'text-green-600' : 'text-gray-900'
                     }`}>
-                      {formatAmount(transaction.amount, transaction.type)}
+                      {formatAmount(transaction.amount, transaction.transaction_type)}
                     </p>
                     <p className={`text-xs ${
                       transaction.status === 'completed' ? 'text-green-600' : 
