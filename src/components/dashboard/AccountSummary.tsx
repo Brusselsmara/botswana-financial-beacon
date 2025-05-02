@@ -1,0 +1,34 @@
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface AccountSummaryProps {
+  balance: number;
+  currency?: string;
+}
+
+export function AccountSummary({ balance, currency = "BWP" }: AccountSummaryProps) {
+  const formattedBalance = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'BWP',
+    minimumFractionDigits: 2
+  }).format(balance);
+  
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pulapay-gradient text-white">
+        <CardTitle className="text-lg font-medium">Account Balance</CardTitle>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-500">Available Balance</p>
+            <p className="text-3xl font-semibold">{formattedBalance}</p>
+          </div>
+          <button className="text-sm text-pulapay-blue hover:underline">
+            Add Money
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
