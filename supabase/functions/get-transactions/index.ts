@@ -29,8 +29,22 @@ serve(async (req) => {
       );
     }
 
-    const url = new URL(req.url);
-    const limit = parseInt(url.searchParams.get('limit') || '20');
+    // Get request body for limit parameter
+    let limit = 20; // Default limit
+    
+    try {
+      const body = await req.json();
+      if (body && body.limit) {
+        limit = parseInt(body.limit);
+      }
+    } catch {
+      // If no JSON body or parsing fails, use URL params as fallback
+      const url = new URL(req.url);
+      const urlLimit = url.searchParams.get('limit');
+      if (urlLimit) {
+        limit = parseInt(urlLimit);
+      }
+    }
     
     // Get the user's transactions
     const { data, error } = await supabaseClient

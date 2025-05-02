@@ -45,9 +45,9 @@ export async function getWalletBalance(): Promise<Wallet> {
 
 // Get transactions
 export async function getTransactions(limit?: number): Promise<Transaction[]> {
-  // Fix for error #1: Use proper params format
-  const params = limit ? { params: { limit } } : {};
-  const { data, error } = await supabase.functions.invoke('get-transactions', params);
+  // Fix: Pass parameters in the body property for Edge Functions
+  const options = limit ? { body: { limit } } : {};
+  const { data, error } = await supabase.functions.invoke('get-transactions', options);
   
   if (error) {
     console.error('Error getting transactions:', error);
