@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { Json } from '@/integrations/supabase/types';
 
 export interface Transaction {
   id: string;
@@ -44,10 +45,9 @@ export async function getWalletBalance(): Promise<Wallet> {
 
 // Get transactions
 export async function getTransactions(limit?: number): Promise<Transaction[]> {
-  const queryParams = limit ? `?limit=${limit}` : '';
-  const { data, error } = await supabase.functions.invoke('get-transactions', {
-    queryParams
-  });
+  // Fix for error #1: Use proper params format
+  const params = limit ? { params: { limit } } : {};
+  const { data, error } = await supabase.functions.invoke('get-transactions', params);
   
   if (error) {
     console.error('Error getting transactions:', error);
@@ -107,16 +107,22 @@ export async function addPaymentMethod(
   details: any,
   isDefault: boolean = false
 ): Promise<any> {
+  // Fix for error #2: Get the current user's ID and include it in the payment method
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User is not authenticated');
+  }
+  
   const { data, error } = await supabase
     .from('payment_methods')
-    .insert([
-      {
-        method_type: methodType,
-        name,
-        details,
-        is_default: isDefault
-      }
-    ])
+    .insert({
+      method_type: methodType,
+      name,
+      details,
+      is_default: isDefault,
+      user_id: user.id
+    })
     .select()
     .single();
   
