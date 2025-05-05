@@ -10,9 +10,10 @@ export interface Transaction {
   recipient_name?: string;
   description?: string;
   status: 'pending' | 'completed' | 'failed';
-  payment_method: 'wallet' | 'bank' | 'card';
+  payment_method: 'wallet' | 'bank' | 'card' | 'blockchain';
   created_at: string;
   updated_at: string;
+  blockchain_tx_hash?: string;
 }
 
 export interface Wallet {
@@ -64,7 +65,7 @@ export async function processPayment(
   recipientIdentifier: string,
   recipientName?: string,
   description?: string,
-  paymentMethod: 'wallet' | 'bank' | 'card' = 'wallet'
+  paymentMethod: 'wallet' | 'bank' | 'card' | 'blockchain' = 'wallet'
 ): Promise<Transaction> {
   const { data, error } = await supabase.functions.invoke('process-payment', {
     body: {
@@ -102,12 +103,12 @@ export async function getBillProviders(): Promise<BillProvider[]> {
 
 // Add a payment method
 export async function addPaymentMethod(
-  methodType: 'bank' | 'card',
+  methodType: 'bank' | 'card' | 'blockchain',
   name: string,
   details: any,
   isDefault: boolean = false
 ): Promise<any> {
-  // Fix for error #2: Get the current user's ID and include it in the payment method
+  // Get the current user's ID and include it in the payment method
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
