@@ -15,6 +15,13 @@ export interface AssetBalance {
   balance: string;
 }
 
+export interface CardDetails {
+  cardNumber: string;
+  expiryDate: string;
+  cvv: string;
+  cardholderName: string;
+}
+
 // Create or get a blockchain wallet for the user
 export async function getOrCreateBlockchainWallet(): Promise<{ publicKey: string }> {
   try {
@@ -80,4 +87,47 @@ export async function sendBlockchainPayment(
     console.error('Error in sendBlockchainPayment:', error);
     throw error;
   }
+}
+
+// Load funds from card to blockchain wallet
+export async function loadFundsFromCard(
+  publicKey: string,
+  amount: number,
+  currency: string,
+  cardDetails: CardDetails
+): Promise<{ amount: number; currency: string; timestamp: string }> {
+  try {
+    // Mask card number for security
+    const maskedCard = {
+      ...cardDetails,
+      cardNumber: cardDetails.cardNumber.replace(/\d(?=\d{4})/g, "*")
+    };
+    
+    const { data, error } = await supabase.functions.invoke('stellar-operations', {
+      body: {
+        operation: 'load_funds',
+        publicKey,
+        amount: amount.toString(),
+        currency,
+        cardDetails: maskedCard
+      }
+    });
+
+    if (error) {
+      console.error('Error loading funds from card:', error);
+      throw new Error(error.message || 'Failed to load funds from card');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in loadFundsFromCard:', error);
+    throw error;
+  }
+}
+
+// Get currency exchange rate (XLM to BWP)
+export async function getExchangeRate(): Promise<number> {
+  // In a real app, this would fetch from an exchange rate API
+  // For demo purposes, we'll use a fixed rate
+  return 12.5; // 1 XLM = 12.5 BWP
 }

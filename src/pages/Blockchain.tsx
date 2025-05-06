@@ -1,9 +1,30 @@
 
 import { BlockchainWallet } from "@/components/blockchain/BlockchainWallet";
 import { BlockchainSendForm } from "@/components/blockchain/BlockchainSendForm";
+import { CardLoadForm } from "@/components/blockchain/CardLoadForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
+import { getOrCreateBlockchainWallet } from "@/services/blockchainService";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export function Blockchain() {
+  const [publicKey, setPublicKey] = useState<string>("");
+  
+  useEffect(() => {
+    const fetchWalletKey = async () => {
+      try {
+        const { publicKey } = await getOrCreateBlockchainWallet();
+        setPublicKey(publicKey);
+      } catch (error) {
+        console.error("Error fetching wallet key:", error);
+      }
+    };
+    
+    fetchWalletKey();
+  }, []);
+
   return (
     <div className="container py-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Blockchain Payments</h1>
@@ -14,11 +35,22 @@ export function Blockchain() {
         </div>
         
         <div>
-          <Tabs defaultValue="send">
+          <Tabs defaultValue="load">
             <TabsList className="w-full mb-4">
+              <TabsTrigger value="load" className="flex-1">Load Funds</TabsTrigger>
               <TabsTrigger value="send" className="flex-1">Send</TabsTrigger>
               <TabsTrigger value="receive" className="flex-1">Receive</TabsTrigger>
             </TabsList>
+            
+            <TabsContent value="load">
+              {publicKey ? (
+                <CardLoadForm publicKey={publicKey} />
+              ) : (
+                <Card className="text-center p-6">
+                  <p>Loading wallet information...</p>
+                </Card>
+              )}
+            </TabsContent>
             
             <TabsContent value="send">
               <BlockchainSendForm />
@@ -36,18 +68,18 @@ export function Blockchain() {
                   <div className="border rounded-lg p-4 text-center">
                     <p className="mb-2 text-sm text-gray-500">Your Stellar Address</p>
                     <p className="font-mono text-xs break-all" id="blockchain-address">
-                      {/* This will be populated by JavaScript */}
+                      {publicKey || "Loading..."}
                     </p>
                     <Button 
                       onClick={() => {
-                        const address = document.getElementById('blockchain-address')?.innerText;
-                        if (address) {
-                          navigator.clipboard.writeText(address);
+                        if (publicKey) {
+                          navigator.clipboard.writeText(publicKey);
                           toast.success("Address copied to clipboard");
                         }
                       }}
                       variant="outline"
                       className="mt-2"
+                      disabled={!publicKey}
                     >
                       Copy Address
                     </Button>
@@ -76,8 +108,3 @@ export function Blockchain() {
 }
 
 export default Blockchain;
-
-// Add missing imports
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";

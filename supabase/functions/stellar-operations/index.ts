@@ -35,7 +35,8 @@ serve(async (req) => {
     }
 
     // Get request body for operation details
-    const { operation, publicKey, amount, destination, secretKey } = await req.json();
+    const requestData = await req.json();
+    const { operation, publicKey, amount, destination, secretKey } = requestData;
 
     // Get or create a Stellar account for the user
     if (operation === 'create_account') {
@@ -196,6 +197,67 @@ serve(async (req) => {
         console.error('Error sending Stellar payment:', error);
         return new Response(
           JSON.stringify({ error: 'Failed to send Stellar payment' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // New operation for card loading
+    if (operation === 'load_funds') {
+      try {
+        const { cardDetails, amount, currency } = requestData;
+        
+        if (!publicKey || !amount || !cardDetails) {
+          return new Response(
+            JSON.stringify({ error: 'Public key, amount, and card details are required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // In a real implementation, you would integrate with a payment processor here
+        // For this demo, we'll simulate a successful transaction and update balances
+        
+        // Record the transaction as a "load" transaction
+        await supabaseClient
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            transaction_type: 'load',
+            amount: parseFloat(amount),
+            recipient_identifier: publicKey,
+            description: 'Card load to blockchain wallet',
+            payment_method: 'card',
+            status: 'completed',
+            currency: currency || 'BWP'
+          });
+
+        // Update user's wallet balance
+        await supabaseClient
+          .from('wallets')
+          .upsert({
+            user_id: user.id,
+            balance: supabaseClient.rpc('increment_balance', { amount_to_add: parseFloat(amount) }),
+            currency: currency || 'BWP',
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            data: { 
+              amount,
+              currency: currency || 'BWP',
+              timestamp: new Date().toISOString()
+            } 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Error loading funds:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to load funds from card' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

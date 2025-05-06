@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import SendMoney from "./pages/SendMoney";
 import PayBills from "./pages/PayBills";
 import Transactions from "./pages/Transactions";
+import Blockchain from "./pages/Blockchain";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,11 @@ const App = () => (
             <Route path="/transactions" element={
               <RequireAuth>
                 <Layout><Transactions /></Layout>
+              </RequireAuth>
+            } />
+            <Route path="/blockchain" element={
+              <RequireAuth>
+                <Layout><Blockchain /></Layout>
               </RequireAuth>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
