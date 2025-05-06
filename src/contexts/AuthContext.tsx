@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // If user just signed in/up, create blockchain wallet
-        if ((event === 'SIGNED_IN' || event === 'SIGNED_UP') && session?.user) {
+        // If user just signed in or signed up, create blockchain wallet
+        if (session?.user) {
           // Use setTimeout to avoid Supabase deadlocks
           setTimeout(() => {
             ensureBlockchainWallet(session.user.id);
