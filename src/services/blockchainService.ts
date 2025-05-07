@@ -25,7 +25,7 @@ export interface CardDetails {
 // Create or get a blockchain wallet for the user
 export async function getOrCreateBlockchainWallet(): Promise<{ publicKey: string }> {
   try {
-    console.log('Calling stellar-operations edge function to create/get wallet');
+    console.log('Attempting to get or create blockchain wallet');
     
     // First, try to get the existing wallet from database
     const { data: existingWallets, error: fetchError } = await supabase
@@ -36,6 +36,7 @@ export async function getOrCreateBlockchainWallet(): Promise<{ publicKey: string
     
     if (fetchError) {
       console.error('Error fetching existing wallet:', fetchError);
+      throw new Error(`Failed to fetch wallet: ${fetchError.message}`);
     }
     
     if (existingWallets && existingWallets.length > 0) {
@@ -61,7 +62,7 @@ export async function getOrCreateBlockchainWallet(): Promise<{ publicKey: string
     }
     
     console.log('Successfully created new wallet:', data.publicKey);
-    return data;
+    return { publicKey: data.publicKey };
   } catch (error) {
     console.error('Error in getOrCreateBlockchainWallet:', error);
     throw error;

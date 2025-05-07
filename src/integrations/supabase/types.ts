@@ -63,6 +63,39 @@ export type Database = {
         }
         Relationships: []
       }
+      blockchain_wallets: {
+        Row: {
+          blockchain: string
+          created_at: string
+          encrypted_secret: string | null
+          id: string
+          is_active: boolean
+          public_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blockchain?: string
+          created_at?: string
+          encrypted_secret?: string | null
+          id?: string
+          is_active?: boolean
+          public_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blockchain?: string
+          created_at?: string
+          encrypted_secret?: string | null
+          id?: string
+          is_active?: boolean
+          public_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chats: {
         Row: {
           created_at: string
