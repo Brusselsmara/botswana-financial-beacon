@@ -25,16 +25,42 @@ export interface CardDetails {
 // Create or get a blockchain wallet for the user
 export async function getOrCreateBlockchainWallet(): Promise<{ publicKey: string }> {
   try {
-    // Call the Stellar operations endpoint to create or fetch account
+    console.log('Calling stellar-operations edge function to create/get wallet');
+    
+    // First, try to get the existing wallet from database
+    const { data: existingWallets, error: fetchError } = await supabase
+      .from('blockchain_wallets')
+      .select('public_key')
+      .eq('is_active', true)
+      .limit(1);
+    
+    if (fetchError) {
+      console.error('Error fetching existing wallet:', fetchError);
+    }
+    
+    if (existingWallets && existingWallets.length > 0) {
+      console.log('Found existing wallet in database:', existingWallets[0].public_key);
+      return { publicKey: existingWallets[0].public_key };
+    }
+    
+    console.log('No existing wallet found, creating new one via edge function');
+    
+    // If no wallet exists, call the edge function to create one
     const { data, error } = await supabase.functions.invoke('stellar-operations', {
       body: { operation: 'create_account' }
     });
 
     if (error) {
-      console.error('Error creating blockchain wallet:', error);
+      console.error('Edge function error creating blockchain wallet:', error);
       throw new Error(error.message || 'Failed to create blockchain wallet');
     }
 
+    if (!data || !data.publicKey) {
+      console.error('Invalid response from edge function:', data);
+      throw new Error('Invalid response from wallet creation');
+    }
+    
+    console.log('Successfully created new wallet:', data.publicKey);
     return data;
   } catch (error) {
     console.error('Error in getOrCreateBlockchainWallet:', error);

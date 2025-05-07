@@ -34,62 +34,98 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error ensuring blockchain wallet:', error);
       toast.error('Failed to create blockchain wallet');
+      return null;
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let isMounted = true;
+    
+    // First attach the auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
-        setSession(session);
-        setUser(session?.user ?? null);
+      async (event, currentSession) => {
+        console.log('Auth state changed:', event, currentSession?.user?.id);
         
-        // IMPORTANT: Check for specific events to create wallet
-        // Use string comparison instead of type comparison to avoid TypeScript errors
-        if (event === 'SIGNED_IN' || event.toString() === 'SIGNED_UP') {
-          if (session?.user) {
-            // Use setTimeout to avoid Supabase deadlocks
-            setTimeout(() => {
-              console.log('Creating wallet after event:', event);
-              ensureBlockchainWallet(session.user.id);
-            }, 0);
+        if (isMounted) {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          if (currentSession?.user) {
+            const eventString = event.toString();
+            // Check for both SIGNED_IN and SIGNED_UP events explicitly as strings
+            if (eventString === 'SIGNED_IN' || eventString === 'SIGNED_UP') {
+              console.log('Authentication event detected:', eventString);
+              // Using timeout to avoid Supabase auth deadlocks
+              setTimeout(() => {
+                if (isMounted) {
+                  console.log('Creating wallet after auth event');
+                  ensureBlockchainWallet(currentSession.user.id)
+                    .then(key => console.log('Wallet creation after auth event completed:', key ? 'success' : 'failed'));
+                }
+              }, 500);
+            }
           }
+          
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      // If user is already logged in, ensure they have a blockchain wallet
-      if (session?.user) {
-        setTimeout(() => {
-          ensureBlockchainWallet(session.user.id);
-        }, 0);
+    // Then check for existing session on load
+    const checkExistingSession = async () => {
+      try {
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        
+        if (isMounted) {
+          setSession(existingSession);
+          setUser(existingSession?.user ?? null);
+          
+          // If user is already logged in, ensure they have a blockchain wallet
+          if (existingSession?.user) {
+            console.log('Existing session found, creating wallet if needed');
+            setTimeout(() => {
+              if (isMounted) {
+                ensureBlockchainWallet(existingSession.user.id)
+                  .then(key => console.log('Wallet creation for existing session completed:', key ? 'success' : 'failed'));
+              }
+            }, 500);
+          }
+          
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-      
-      setLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    checkExistingSession();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
       console.log('Signing in user:', email);
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
-      if (!error) navigate('/dashboard');
+      if (!error && data?.user) {
+        console.log('Sign in successful, navigating to dashboard');
+        // Create wallet is now handled by auth state change listener
+        navigate('/dashboard');
+      }
       return { error };
     } catch (error) {
+      console.error('Error during sign in:', error);
       return { error };
     }
   };
@@ -102,17 +138,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       });
       
-      if (!error) {
-        console.log('User signed up successfully:', data.user?.id);
+      if (!error && data?.user) {
+        console.log('User signed up successfully:', data.user.id);
+        // Wallet creation is now handled by auth state change listener
         navigate('/dashboard');
       }
       return { data, error };
     } catch (error) {
+      console.error('Error during signup:', error);
       return { error, data: null };
     }
   };
 
   const signOut = async () => {
+    console.log('Signing out user');
     await supabase.auth.signOut();
     navigate('/signin');
   };
