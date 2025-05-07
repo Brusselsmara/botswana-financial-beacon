@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as StellarSdk from "https://esm.sh/stellar-sdk@11.2.1";
@@ -9,7 +8,8 @@ const corsHeaders = {
 };
 
 // Configure Stellar network connection (using testnet initially)
-const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
+// Fix: Use the correct way to instantiate Server from StellarSdk
+const server = new StellarSdk.Server("https://horizon-testnet.stellar.org");
 const networkPassphrase = StellarSdk.Networks.TESTNET;
 
 serve(async (req) => {
@@ -38,9 +38,12 @@ serve(async (req) => {
     const requestData = await req.json();
     const { operation, publicKey, amount, destination, secretKey } = requestData;
 
+    console.log(`Processing operation: ${operation}`);
+
     // Get or create a Stellar account for the user
     if (operation === 'create_account') {
       try {
+        console.log(`Checking if user ${user.id} already has a Stellar account`);
         // Check if user already has a Stellar account
         const { data: existingWallet } = await supabaseClient
           .from('blockchain_wallets')
@@ -49,6 +52,7 @@ serve(async (req) => {
           .single();
 
         if (existingWallet) {
+          console.log(`Found existing wallet: ${existingWallet.public_key}`);
           return new Response(
             JSON.stringify({ 
               success: true, 
@@ -58,15 +62,26 @@ serve(async (req) => {
           );
         }
 
+        console.log("Generating new Stellar keypair");
         // Generate a new Stellar keypair
         const keypair = StellarSdk.Keypair.random();
         const publicKey = keypair.publicKey();
         const secretKey = keypair.secret();
 
-        // Fund the account using Friendbot (only for testnet)
-        await fetch(`https://friendbot.stellar.org?addr=${publicKey}`);
+        console.log(`New keypair generated with public key: ${publicKey}`);
+
+        try {
+          // Fund the account using Friendbot (only for testnet)
+          console.log("Funding account using Friendbot");
+          await fetch(`https://friendbot.stellar.org?addr=${publicKey}`);
+          console.log("Account funded successfully");
+        } catch (fundError) {
+          console.error("Error funding account:", fundError);
+          // Continue even if funding fails - we'll store the keypair anyway
+        }
 
         // Store the wallet info in the database (encrypt secret key in production)
+        console.log("Storing wallet in database");
         await supabaseClient
           .from('blockchain_wallets')
           .insert({
@@ -76,6 +91,8 @@ serve(async (req) => {
             encrypted_secret: secretKey, // In production, use encryption
             is_active: true
           });
+
+        console.log("Wallet stored successfully");
 
         return new Response(
           JSON.stringify({ 
@@ -87,7 +104,7 @@ serve(async (req) => {
       } catch (error) {
         console.error('Error creating Stellar account:', error);
         return new Response(
-          JSON.stringify({ error: 'Failed to create Stellar account' }),
+          JSON.stringify({ error: 'Failed to create Stellar account', details: error.message }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
