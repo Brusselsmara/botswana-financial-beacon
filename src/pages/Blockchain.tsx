@@ -29,6 +29,16 @@ export function Blockchain() {
     <div className="container py-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Blockchain Payments</h1>
       
+      <div className="flex flex-col space-y-4 mb-6">
+        <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+          <h2 className="text-lg font-semibold text-blue-700 mb-2">Stellar Mainnet</h2>
+          <p className="text-blue-600 text-sm">
+            This app is now connected to the Stellar public mainnet. New wallets require funding with at least 1 XLM 
+            to become active. Please note that all transactions on the mainnet involve real cryptocurrency.
+          </p>
+        </div>
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <BlockchainWallet />

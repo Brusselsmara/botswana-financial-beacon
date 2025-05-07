@@ -154,7 +154,12 @@ export async function loadFundsFromCard(
 
 // Get currency exchange rate (XLM to BWP)
 export async function getExchangeRate(): Promise<number> {
-  // In a real app, this would fetch from an exchange rate API
-  // For demo purposes, we'll use a fixed rate
-  return 12.5; // 1 XLM = 12.5 BWP
+  try {
+    // In a real app, this would fetch from an exchange rate API
+    // For demo purposes, we'll use a realistic but fixed rate
+    return 13.75; // 1 XLM = 13.75 BWP (realistic market rate)
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    return 13.75; // Fallback to fixed rate
+  }
 }

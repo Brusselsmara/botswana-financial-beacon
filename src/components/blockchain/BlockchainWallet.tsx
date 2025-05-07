@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { getOrCreateBlockchainWallet, getBlockchainBalance, AssetBalance } from "@/services/blockchainService";
 import { toast } from "sonner";
-import { Copy, ExternalLink } from "lucide-react";
+import { Copy, ExternalLink, AlertCircle } from "lucide-react";
 
 export function BlockchainWallet() {
   const [publicKey, setPublicKey] = useState<string>("");
@@ -51,6 +51,12 @@ export function BlockchainWallet() {
       setPublicKey(publicKey);
       fetchBalances(publicKey);
       toast.success("Blockchain wallet created successfully");
+      
+      // Show funding notice for mainnet wallets
+      toast.info("Important: Your wallet needs funding", {
+        description: "Send at least 1 XLM to this address to activate it.",
+        duration: 8000,
+      });
     } catch (error) {
       console.error("Error creating blockchain wallet:", error);
       toast.error("Failed to create blockchain wallet");
@@ -98,7 +104,7 @@ export function BlockchainWallet() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    onClick={() => window.open(`https://stellar.expert/explorer/testnet/account/${publicKey}`, '_blank')}
+                    onClick={() => window.open(`https://stellar.expert/explorer/public/account/${publicKey}`, '_blank')}
                     title="View on Explorer"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -106,6 +112,20 @@ export function BlockchainWallet() {
                 </div>
               </div>
             </div>
+
+            {balances.length === 0 && (
+              <div className="bg-amber-50 p-3 rounded-md border border-amber-200">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 mr-2" />
+                  <div>
+                    <h4 className="font-medium text-amber-800">Activation Required</h4>
+                    <p className="text-sm text-amber-700">
+                      Your wallet needs at least 1 XLM to become active. Please send XLM to your address to activate it.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2">Balances</h3>
@@ -146,7 +166,7 @@ export function BlockchainWallet() {
       </CardContent>
       <CardFooter className="flex flex-col items-start border-t px-6 py-4">
         <p className="text-xs text-gray-500">
-          Your Stellar blockchain wallet supports USDC, XLM, and other assets on the Stellar network. 
+          Your Stellar blockchain wallet supports USDC, XLM, and other assets on the public Stellar network. 
           Transactions are secure and typically complete within 3-5 seconds.
         </p>
       </CardFooter>

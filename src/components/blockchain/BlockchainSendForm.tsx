@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { getOrCreateBlockchainWallet, getBlockchainBalance, sendBlockchainPayment } from "@/services/blockchainService";
 import { processPayment } from "@/services/paymentService";
 import { useQueryClient } from "@tanstack/react-query";
+import { AlertCircle } from "lucide-react";
 
 export function BlockchainSendForm() {
   const [amount, setAmount] = useState("");
@@ -17,6 +18,7 @@ export function BlockchainSendForm() {
   const [secretKey, setSecretKey] = useState(""); // In a real app, don't expose this to frontend!
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [hasBalance, setHasBalance] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -25,6 +27,12 @@ export function BlockchainSendForm() {
       try {
         const { publicKey } = await getOrCreateBlockchainWallet();
         setPublicKey(publicKey);
+        
+        if (publicKey) {
+          // Check if the wallet has any balance
+          const { balances } = await getBlockchainBalance(publicKey);
+          setHasBalance(balances.length > 0);
+        }
         
         // In a real application, the secret key should NEVER be exposed to the frontend
         // This is just for demo purposes in a test environment
@@ -110,6 +118,20 @@ export function BlockchainSendForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!hasBalance ? (
+          <div className="bg-amber-50 p-4 rounded-md border border-amber-200 mb-4">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 mr-2" />
+              <div>
+                <h4 className="font-medium text-amber-800">Wallet Not Activated</h4>
+                <p className="text-sm text-amber-700">
+                  Your wallet needs at least 1 XLM to send transactions. Please fund your wallet first.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="recipient">Recipient Address</Label>
@@ -119,7 +141,7 @@ export function BlockchainSendForm() {
               required
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || !hasBalance}
             />
           </div>
           
@@ -135,7 +157,7 @@ export function BlockchainSendForm() {
                 step="0.0000001"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || !hasBalance}
               />
             </div>
           </div>
@@ -147,7 +169,7 @@ export function BlockchainSendForm() {
               placeholder="Add a note to this transaction"
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || !hasBalance}
             />
           </div>
           
@@ -178,7 +200,7 @@ export function BlockchainSendForm() {
           <Button 
             type="submit" 
             className="w-full bg-pulapay-blue hover:bg-pulapay-blue-dark"
-            disabled={isLoading}
+            disabled={isLoading || !hasBalance}
           >
             {isLoading ? "Processing..." : "Send Payment"}
           </Button>

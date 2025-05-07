@@ -8,10 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configure Stellar network connection (using testnet initially)
-// Fix: Use the correct way to instantiate Server from the StellarSdk
-const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
-const networkPassphrase = StellarSdk.Networks.TESTNET;
+// Configure Stellar network connection (using mainnet)
+const server = new StellarSdk.Horizon.Server("https://horizon.stellar.org");
+const networkPassphrase = StellarSdk.Networks.PUBLIC;
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -78,15 +77,8 @@ serve(async (req) => {
 
         console.log(`New keypair generated with public key: ${publicKey}`);
 
-        try {
-          // Fund the account using Friendbot (only for testnet)
-          console.log("Funding account using Friendbot");
-          await fetch(`https://friendbot.stellar.org?addr=${publicKey}`);
-          console.log("Account funded successfully");
-        } catch (fundError) {
-          console.error("Error funding account:", fundError);
-          // Continue even if funding fails - we'll store the keypair anyway
-        }
+        // Note: On mainnet, we cannot use Friendbot - account needs to be funded externally
+        console.log("IMPORTANT: This account needs to be funded externally - minimum 1 XLM");
 
         // Store the wallet info in the database
         console.log("Storing wallet in database");
@@ -96,7 +88,7 @@ serve(async (req) => {
             user_id: user.id,
             blockchain: 'stellar',
             public_key: publicKey,
-            encrypted_secret: secretKey, // In production, use encryption
+            encrypted_secret: secretKey, // In production, use proper encryption
             is_active: true
           });
 
@@ -232,7 +224,7 @@ serve(async (req) => {
       }
     }
 
-    // New operation for card loading
+    // Load funds from card to blockchain wallet
     if (operation === 'load_funds') {
       try {
         const { cardDetails, amount, currency } = requestData;
