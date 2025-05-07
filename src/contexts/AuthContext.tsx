@@ -4,6 +4,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { getOrCreateBlockchainWallet } from '@/services/blockchainService';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -25,11 +26,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // This function creates a blockchain wallet for a user after signup/signin
   const ensureBlockchainWallet = async (userId: string) => {
     try {
+      console.log('Creating blockchain wallet for user:', userId);
       const { publicKey } = await getOrCreateBlockchainWallet();
       console.log('Blockchain wallet created or retrieved:', publicKey);
+      toast.success('Blockchain wallet is ready');
       return publicKey;
     } catch (error) {
       console.error('Error ensuring blockchain wallet:', error);
+      toast.error('Failed to create blockchain wallet');
     }
   };
 
@@ -37,15 +41,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
-        // If user just signed in or signed up, create blockchain wallet
-        if (session?.user) {
-          // Use setTimeout to avoid Supabase deadlocks
-          setTimeout(() => {
-            ensureBlockchainWallet(session.user.id);
-          }, 0);
+        // IMPORTANT: Check for specific events to create wallet
+        if (event === 'SIGNED_IN' || event === 'SIGNED_UP') {
+          if (session?.user) {
+            // Use setTimeout to avoid Supabase deadlocks
+            setTimeout(() => {
+              console.log('Creating wallet after event:', event);
+              ensureBlockchainWallet(session.user.id);
+            }, 0);
+          }
         }
         
         setLoading(false);
@@ -59,7 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // If user is already logged in, ensure they have a blockchain wallet
       if (session?.user) {
-        ensureBlockchainWallet(session.user.id);
+        setTimeout(() => {
+          ensureBlockchainWallet(session.user.id);
+        }, 0);
       }
       
       setLoading(false);
@@ -89,7 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       });
       
-      if (!error) navigate('/dashboard');
+      if (!error) {
+        console.log('User signed up successfully:', data.user?.id);
+        navigate('/dashboard');
+      }
       return { data, error };
     } catch (error) {
       return { error, data: null };
