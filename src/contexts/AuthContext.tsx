@@ -46,7 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         // IMPORTANT: Check for specific events to create wallet
-        if (event === 'SIGNED_IN' || event === 'SIGNED_UP') {
+        // Use string comparison instead of type comparison to avoid TypeScript errors
+        if (event === 'SIGNED_IN' || event.toString() === 'SIGNED_UP') {
           if (session?.user) {
             // Use setTimeout to avoid Supabase deadlocks
             setTimeout(() => {
